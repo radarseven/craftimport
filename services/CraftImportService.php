@@ -17,9 +17,25 @@ class CraftImportService extends BaseApplicationComponent
         $xml = simplexml_load_file('http://www.DOMAIN.com/blog/export');
         $importTags = true;
         // If importing tags, set your Tag Set ID
-        $tagSetId = 1;
+        //$tagSetId = 1;
+
         // If importing tags, set your Tag Field ID
-        $tagFieldId = 3;
+        //$tagFieldId = 3;
+        
+        /**
+         * An array of tags to be imported.
+         * @var array 
+         *          name    = The corresponding element in the XML field.
+         *          setId   = Matching Tags set ID in Craft.
+         *          fieldId = Matching Tags field ID in Craft.
+         */
+        $tagsData = array(
+            'name' => array(
+                'setId'   => '',
+                'fieldId' => '',
+            ),
+        );
+
         $sectionId = 3; // Visit settings for your Section and check the URL
         $typeId = 3; // Visit Entry Types for your Section and check the URL for the Entry Type
 
@@ -77,37 +93,42 @@ class CraftImportService extends BaseApplicationComponent
             {
                 // Note that we're doing nothing to limit the number of records processed
                 //echo "Entry saved<br />\n\n";
-                if ( $importTags ) {
-                    $command = craft()->db->createCommand();
-                    $entryRecord =  $command
-                                    ->select('entryId')
-                                    ->from('entries_i18n')
-                                    ->where(array("AND", "slug='" . $importEntry->slug . "'", "sectionId='" . $sectionId . "'"))
-                                    ->queryRow();
-
-                    $tags = array();
-
-                    foreach ($importEntry->categories->category as $category) {
-                        $tag = new TagModel();
-                        $tag->setId = $tagSetId;
-                        $tag->name = $category;
-                        //print_r($tag);
-                        craft()->tags->saveTag($tag);
-
+                if ( $importTags && is_array( $tagsData ) ) 
+                {
+                    foreach( $tagData as $tag => $tagData )
+                    {
                         $command = craft()->db->createCommand();
-                        $tagRecord =  $command
-                                        ->select('id')
-                                        ->from('tags')
-                                        ->where("name='" . $category . "'")
+                        $entryRecord =  $command
+                                        ->select('entryId')
+                                        ->from('entries_i18n')
+                                        ->where(array("AND", "slug='" . $importEntry->slug . "'", "sectionId='" . $sectionId . "'"))
                                         ->queryRow();
-                        //echo $tagRecord;
-                        echo 'entry: ' . $entryRecord['entryId'] . "<br />";
-                        echo 'tag: ' . $tagRecord['id'] . "<br />";
 
-                        $tags[] = $tagRecord['id'];
+                        $tags = array();
+
+                        foreach( $importEntry->tags->$tag as $tag )
+                        {
+                            $tag = new TagModel();
+                            $tag->setId = $tagData['setId'];
+                            $tag->name = $tag;
+                            //print_r($tag);
+                            craft()->tags->saveTag($tag);
+
+                            $command = craft()->db->createCommand();
+                            $tagRecord =  $command
+                                            ->select('id')
+                                            ->from('tags')
+                                            ->where("name='" . $tag . "'")
+                                            ->queryRow();
+                            //echo $tagRecord;
+                            echo 'entry: ' . $entryRecord['entryId'] . "<br />";
+                            echo 'tag: ' . $tagRecord['id'] . "<br />";
+
+                            $tags[] = $tagRecord['id'];
+                        }
+                        craft()->relations->saveRelations($tagData['fieldId'], $entryRecord['entryId'], $tags);
+                        echo "<br />\n\n";
                     }
-                    craft()->relations->saveRelations($tagFieldId, $entryRecord['entryId'], $tags);
-                    echo "<br />\n\n";
                 }
                 continue;
             } else {
