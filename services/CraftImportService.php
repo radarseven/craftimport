@@ -11,10 +11,14 @@ class CraftImportService extends BaseApplicationComponent
 
     public function loadEntries()
     {
+        set_time_limit(0);
+
         $retVal = true;
 
         // Use SimpleXML to fetch an XML export of channel data from an ExpressionEngine site
-        $xml = simplexml_load_file('http://www.DOMAIN.com/blog/export');
+        $xml = simplexml_load_file('http://synergema.com/blog-export');
+        //print_r($xml->blog[0]); exit;
+        //var_export($xml); exit;
         $importTags = true;
         // If importing tags, set your Tag Set ID
         //$tagSetId = 1;
@@ -30,16 +34,28 @@ class CraftImportService extends BaseApplicationComponent
          *          fieldId = Matching Tags field ID in Craft.
          */
         $tagsData = array(
-            'name' => array(
-                'setId'   => '',
-                'fieldId' => '',
+            'categories' => array(
+                'setId'   => 2,
+                'fieldId' => 30,
+            ),
+            'tags' => array(
+                'setId' => 3,
+                'fieldId' => 3,
             ),
         );
 
-        $sectionId = 3; // Visit settings for your Section and check the URL
-        $typeId = 3; // Visit Entry Types for your Section and check the URL for the Entry Type
+        /**
+         * Import yo ASSets.
+         */
 
-        foreach ($xml->blog[0]->entry as $importEntry) {
+        $sectionId = 8; // Visit settings for your Section and check the URL
+        $typeId = 8; // Visit Entry Types for your Section and check the URL for the Entry Type
+
+        foreach ($xml->blog[0]->entry as $importEntry)
+        {
+            //var_export($importEntry);exit;
+            //echo $importEntry->slug;exit;
+
             // Validate fetch on screen
             /*echo $importEntry->entry_date . '<br />';
             echo $importEntry->title . '<br />';
@@ -50,12 +66,12 @@ class CraftImportService extends BaseApplicationComponent
             // Swap Assets URLs in posts
             // http://s3.amazonaws.com/YOURBUCKET/uploads
             // $newUrl = addslashes('http://s3.amazonaws.com/YOURBUCKET/uploads'); // Actually...Should not be needed
-            $newUrl = 'http://s3.amazonaws.com/YOURBUCKET/uploads';
+            // $newUrl = 'http://s3.amazonaws.com/YOURBUCKET/uploads';
             // Make sure you reference this variable below!
             $post = $importEntry->post;
             // Make sure you run the string containing a subsequent substring first!
-            $post = str_replace('http://www.DOMAIN.com/images/uploads', $newUrl, $post);
-            $post = str_replace('/images/uploads', $newUrl, $post);
+            // $post = str_replace('http://www.DOMAIN.com/images/uploads', $newUrl, $post);
+            // $post = str_replace('/images/uploads', $newUrl, $post);
 
             // Check for existing entry
             $command = craft()->db->createCommand();
@@ -87,15 +103,17 @@ class CraftImportService extends BaseApplicationComponent
             $entry->slug = $importEntry->slug;
             $entry->getContent()->setAttributes(array(
                 'title' => $importEntry->title,
-                'post' => $post
+                // 'pageContent' => $post, // This don't work.
+                'featuredImageUrl' => $importEntry->image,
             ));
             if ( craft()->entries->saveEntry($entry) )
             {
+
                 // Note that we're doing nothing to limit the number of records processed
                 //echo "Entry saved<br />\n\n";
                 if ( $importTags && is_array( $tagsData ) ) 
                 {
-                    foreach( $tagData as $tag => $tagData )
+                    foreach( $tagsData as $tagElement => $tagData )
                     {
                         $command = craft()->db->createCommand();
                         $entryRecord =  $command
@@ -106,23 +124,27 @@ class CraftImportService extends BaseApplicationComponent
 
                         $tags = array();
 
-                        foreach( $importEntry->tags->$tag as $tag )
+                        if(!isset($importEntry->tags->$tagElement->tag))
+                        {
+                            continue;
+                        }
+
+                        foreach( $importEntry->tags->$tagElement->tag as $tagName )
                         {
                             $tag = new TagModel();
                             $tag->setId = $tagData['setId'];
-                            $tag->name = $tag;
-                            //print_r($tag);
+                            $tag->name = $tagName;
                             craft()->tags->saveTag($tag);
 
                             $command = craft()->db->createCommand();
                             $tagRecord =  $command
                                             ->select('id')
                                             ->from('tags')
-                                            ->where("name='" . $tag . "'")
+                                            ->where("name='" . $tagName . "'")
                                             ->queryRow();
                             //echo $tagRecord;
-                            echo 'entry: ' . $entryRecord['entryId'] . "<br />";
-                            echo 'tag: ' . $tagRecord['id'] . "<br />";
+                            //echo 'entry: ' . $entryRecord['entryId'] . "<br />";
+                            //echo 'tag: ' . $tagRecord['id'] . "<br />";
 
                             $tags[] = $tagRecord['id'];
                         }
