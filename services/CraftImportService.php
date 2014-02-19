@@ -177,7 +177,7 @@ class CraftImportService extends BaseApplicationComponent
                 );
 
                 // Set the new Matrix data
-                $entry->getContent()->pageContent = $matrixData;
+                $entry->getContent()->pageCon stent = $matrixData;
             }
 
             /**
