@@ -148,7 +148,7 @@ class CraftImportService extends BaseApplicationComponent
 
             $attributesMap = array(
                 'title'            => 'title',
-                'post'             => 'legacyBody',
+                //'post'             => 'legacyBody',
                 'image'            => 'legacyFeaturedImage',
                 'meta_title'       => 'metaSeoTitle',
                 'meta_description' => 'metaDescription',
@@ -165,8 +165,23 @@ class CraftImportService extends BaseApplicationComponent
                 }
             }
 
+            if( isset($importEntry->post) )
+            {
+                // Add new rows
+                $matrixData['newPageContent'] = array(                // The 'new' prefix tells Matrix this is a new block
+                    'type' => 'text',
+                    'enabled' => true,
+                    'fields' => array(
+                        'text' => $post,
+                    )
+                );
+
+                // Set the new Matrix data
+                $entry->getContent()->pageContent = $matrixData;
+            }
+
             /**
-             * Attempt to populate entry custom fields.
+             * Populate entry custom fields.
              */
             $entry->getContent()->setAttributes($attributes);
 
