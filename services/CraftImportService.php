@@ -7,7 +7,7 @@ class CraftImportService extends BaseApplicationComponent
 
     public function __construct()
     {
-        parent::__construct();
+
     }
 
     /**
@@ -66,11 +66,11 @@ class CraftImportService extends BaseApplicationComponent
             // Validate fetch on screen
             if( $retVal )
             {
-                echo $importEntry->entry_date . '<br />';
-                echo $importEntry->title . '<br />';
-                echo $importEntry->slug . '<br />';
-                echo $importEntry->post . '<br />';
-                echo '<br />';
+                // echo $importEntry->entry_date . '<br />';
+                // echo $importEntry->title . '<br />';
+                // echo $importEntry->slug . '<br />';
+                // echo $importEntry->post . '<br />';
+                // echo '<br />';
             }
 
             // Swap Assets URLs in posts
@@ -78,7 +78,8 @@ class CraftImportService extends BaseApplicationComponent
             // $newUrl = addslashes('http://s3.amazonaws.com/YOURBUCKET/uploads'); // Actually...Should not be needed
             // $newUrl = 'http://s3.amazonaws.com/YOURBUCKET/uploads';
             // Make sure you reference this variable below!
-            $post = $importEntry->post;
+            $post = StringHelper::arrayToString( $importEntry->post );
+
             // Make sure you run the string containing a subsequent substring first!
             // $post = str_replace('http://www.DOMAIN.com/images/uploads', $newUrl, $post);
             // $post = str_replace('/images/uploads', $newUrl, $post);
@@ -103,21 +104,71 @@ class CraftImportService extends BaseApplicationComponent
             }
             //echo "\n\n";
 
-            // Find these in craft/app/models/EntryModel
+            /**
+             * Set attributes for the EntryModel
+             * @ref craft/app/models/EntryModel
+             */
             $entry->sectionId = $sectionId;
-            $entry->typeId = $typeId; 
-            $entry->authorId = 1; // 1 for Admin
+            $entry->typeId = $typeId;
+
+            /**
+             * Attempt to set `entry.authorId` intelligently
+             */
+            if( isset($importEntry->author) && ! empty($importEntry->author) )
+            {
+                switch ( $importEntry->author ) 
+                {
+                    case 'bsteiger@synergema.com':
+                        $entry->authorId = 22;
+                        break;
+                    
+                    case 'cdebolt@synergema.com':
+                        $entry->authorId = 78;
+                        break;
+
+                    default:
+                        $entry->authorId = 1;
+                        break;
+                }
+            }
+            else
+            {
+                $entry->authorId = 1;  // Default, admin
+            }
+
             $entry->enabled = true;
             $entry->postDate = $importEntry->entry_date;
             $entry->slug = $importEntry->slug;
+
             /**
-             * Attempt to populate custom fields.
+             * Custom field attributes array.
+             * @var array
              */
-            $entry->getContent()->setAttributes(array(
-                'title'               => $importEntry->title,
-                'legacyBody'          => $post,
-                'legacyFeaturedImage' => $importEntry->image,
-            ));
+            $attributes = array();
+
+            $attributesMap = array(
+                'title'            => 'title',
+                'post'             => 'legacyBody',
+                'image'            => 'legacyFeaturedImage',
+                'meta_title'       => 'metaSeoTitle',
+                'meta_description' => 'metaDescription',
+            );
+
+            /**
+             * Attributes must be set and not be empty.
+             */
+            foreach( $attributesMap as $xmlKey => $attributeKey )
+            {
+                if( isset($importEntry->$xmlKey) && ! empty($importEntry->$xmlKey) )
+                {
+                    $attributes[$attributeKey] = $importEntry->$xmlKey;
+                }
+            }
+
+            /**
+             * Attempt to populate entry custom fields.
+             */
+            $entry->getContent()->setAttributes($attributes);
 
             /**
              * Attempt to save entry.
