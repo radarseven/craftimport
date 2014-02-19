@@ -4,28 +4,34 @@ namespace Craft;
 
 class CraftImportService extends BaseApplicationComponent
 {
+
     public function __construct()
     {
-
+        parent::__construct();
     }
 
+    /**
+     * Try to create entries
+     * @return (mixed)
+     */
     public function loadEntries()
     {
+        /**
+         * Let's not bomb out!
+         */
         set_time_limit(0);
 
-        $retVal = true;
+        $retVal = false;
 
         // Use SimpleXML to fetch an XML export of channel data from an ExpressionEngine site
         $xml = simplexml_load_file('http://synergema.com/blog-export');
-        //print_r($xml->blog[0]); exit;
-        //var_export($xml); exit;
-        $importTags = true;
-        // If importing tags, set your Tag Set ID
-        //$tagSetId = 1;
 
-        // If importing tags, set your Tag Field ID
-        //$tagFieldId = 3;
-        
+        /**
+         * Should we try to import Tags?
+         * @var boolean
+         */
+        $importTags = true;
+
         /**
          * An array of tags to be imported.
          * @var array 
@@ -39,29 +45,33 @@ class CraftImportService extends BaseApplicationComponent
                 'fieldId' => 30,
             ),
             'tags' => array(
-                'setId' => 3,
+                'setId'   => 3,
                 'fieldId' => 3,
             ),
         );
 
         /**
-         * Import yo ASSets.
+         * Set the section and section type for importing of entries.
+         * @var integer
          */
-
         $sectionId = 8; // Visit settings for your Section and check the URL
         $typeId = 8; // Visit Entry Types for your Section and check the URL for the Entry Type
 
+        /**
+         * Loop through <entry> tags.
+         */
         foreach ($xml->blog[0]->entry as $importEntry)
         {
-            //var_export($importEntry);exit;
-            //echo $importEntry->slug;exit;
 
             // Validate fetch on screen
-            /*echo $importEntry->entry_date . '<br />';
-            echo $importEntry->title . '<br />';
-            echo $importEntry->slug . '<br />';
-            echo $importEntry->post . '<br />';
-            echo '<br />';*/
+            if( $retVal )
+            {
+                echo $importEntry->entry_date . '<br />';
+                echo $importEntry->title . '<br />';
+                echo $importEntry->slug . '<br />';
+                echo $importEntry->post . '<br />';
+                echo '<br />';
+            }
 
             // Swap Assets URLs in posts
             // http://s3.amazonaws.com/YOURBUCKET/uploads
@@ -85,7 +95,6 @@ class CraftImportService extends BaseApplicationComponent
             if (is_null($entryRecord['entryId']))
             {
                 $entry = new EntryModel();
-                //echo 'null';
             }
             else
             {
@@ -101,16 +110,27 @@ class CraftImportService extends BaseApplicationComponent
             $entry->enabled = true;
             $entry->postDate = $importEntry->entry_date;
             $entry->slug = $importEntry->slug;
+            /**
+             * Attempt to populate custom fields.
+             */
             $entry->getContent()->setAttributes(array(
-                'title' => $importEntry->title,
-                // 'pageContent' => $post, // This don't work.
-                'featuredImageUrl' => $importEntry->image,
+                'title'               => $importEntry->title,
+                'legacyBody'          => $post,
+                'legacyFeaturedImage' => $importEntry->image,
             ));
+
+            /**
+             * Attempt to save entry.
+             */
             if ( craft()->entries->saveEntry($entry) )
             {
 
                 // Note that we're doing nothing to limit the number of records processed
                 //echo "Entry saved<br />\n\n";
+                
+                /**
+                 * Import Tags.
+                 */
                 if ( $importTags && is_array( $tagsData ) ) 
                 {
                     foreach( $tagsData as $tagElement => $tagData )
@@ -140,7 +160,7 @@ class CraftImportService extends BaseApplicationComponent
                             $tagRecord =  $command
                                             ->select('id')
                                             ->from('tags')
-                                            ->where("name='" . $tagName . "'")
+                                            ->where("name='" . mysql_real_escape_string( $tagName ) . "'")
                                             ->queryRow();
                             //echo $tagRecord;
                             //echo 'entry: ' . $entryRecord['entryId'] . "<br />";
@@ -153,7 +173,9 @@ class CraftImportService extends BaseApplicationComponent
                     }
                 }
                 continue;
-            } else {
+            } 
+            else 
+            {
                 $retVal = false;
                 break;
             }
