@@ -5,9 +5,31 @@ namespace Craft;
 class CraftImportService extends BaseApplicationComponent
 {
 
+    protected $config;
+    protected $importTags;
+    protected $tagsData;
+    protected $importCategories;
+    protected $categoriesData;
+    protected $entryId;
+
     public function __construct()
     {
+        /**
+         * Tags
+         * @var boolean
+         */
+        $this->importTags = true;
 
+        /**
+         * Categories
+         * @var boolean
+         */
+        $this->importCategories = true;
+        $this->categoriesData = array(
+            'categories' => array(
+                'fieldId' => 30,
+            ),
+        );
     }
 
     /**
@@ -40,10 +62,10 @@ class CraftImportService extends BaseApplicationComponent
          *          fieldId = Matching Tags field ID in Craft.
          */
         $tagsData = array(
-            'categories' => array(
-                'setId'   => 2,
-                'fieldId' => 30,
-            ),
+            // 'categories' => array(
+            //     'setId'   => 2,
+            //     'fieldId' => 30,
+            // ),
             'tags' => array(
                 'setId'   => 3,
                 'fieldId' => 3,
@@ -75,14 +97,15 @@ class CraftImportService extends BaseApplicationComponent
 
             // Swap Assets URLs in posts
             // http://s3.amazonaws.com/YOURBUCKET/uploads
-            // $newUrl = addslashes('http://s3.amazonaws.com/YOURBUCKET/uploads'); // Actually...Should not be needed
-            // $newUrl = 'http://s3.amazonaws.com/YOURBUCKET/uploads';
+            //$newUrl = addslashes('http://s3.amazonaws.com/YOURBUCKET/uploads'); // Actually...Should not be needed
+            $newUrl = 'http://cdn.synergema.com/uploads/blog/legacy';
+            
             // Make sure you reference this variable below!
             $post = StringHelper::arrayToString( $importEntry->post );
 
             // Make sure you run the string containing a subsequent substring first!
-            // $post = str_replace('http://www.DOMAIN.com/images/uploads', $newUrl, $post);
-            // $post = str_replace('/images/uploads', $newUrl, $post);
+            $post = str_replace('http://synergema.com/_media/uploads', $newUrl, $post);
+            //$post = str_replace('/_media/uploads', $newUrl, $post);
 
             // Check for existing entry
             $command = craft()->db->createCommand();
@@ -160,8 +183,17 @@ class CraftImportService extends BaseApplicationComponent
             foreach( $attributesMap as $xmlKey => $attributeKey )
             {
                 if( isset($importEntry->$xmlKey) && ! empty($importEntry->$xmlKey) )
-                {
-                    $attributes[$attributeKey] = $importEntry->$xmlKey;
+                {   
+                    switch ($xmlKey) 
+                    {
+                        case 'image':
+                            $attributes[$attributeKey] = str_replace('http://synergema.com/_media/uploads', $newUrl, $importEntry->$xmlKey);
+                            break;
+                        
+                        default:
+                            $attributes[$attributeKey] = $importEntry->$xmlKey;
+                            break;
+                    }
                 }
             }
 
@@ -190,7 +222,6 @@ class CraftImportService extends BaseApplicationComponent
              */
             if ( craft()->entries->saveEntry($entry) )
             {
-
                 // Note that we're doing nothing to limit the number of records processed
                 //echo "Entry saved<br />\n\n";
                 
@@ -207,6 +238,9 @@ class CraftImportService extends BaseApplicationComponent
                                         ->from('entries_i18n')
                                         ->where(array("AND", "slug='" . $importEntry->slug . "'", "sectionId='" . $sectionId . "'"))
                                         ->queryRow();
+
+                        $this->entryId = $entryRecord['entryId'];
+                        var_export($this->entryId);
 
                         $tags = array();
 
@@ -235,9 +269,18 @@ class CraftImportService extends BaseApplicationComponent
                             $tags[] = $tagRecord['id'];
                         }
                         craft()->relations->saveRelations($tagData['fieldId'], $entryRecord['entryId'], $tags);
-                        echo "<br />\n\n";
+                        //echo "<br />\n\n";
                     }
                 }
+
+                /**
+                 * Import categories?
+                 */
+                if( $this->importCategories )
+                {
+                    $this->saveCategories($importEntry) ;
+                }
+
                 continue;
             } 
             else 
@@ -246,6 +289,87 @@ class CraftImportService extends BaseApplicationComponent
                 break;
             }
         }
+
         return $retVal;
     }
+
+    /**
+     * Save categories.
+     * @param  (int) $entryId          Craft record entryId.
+     * @param  (object) $importEntry   XML entry.
+     * @return (boolean)               Status.
+     */
+    private function saveCategories( $xmlEntry = null )
+    {
+        if( is_null($this->entryId) || is_null($xmlEntry) )
+        {
+            return false;
+        }
+
+        /**
+         * Map the category name to the entryId in Craft.
+         */
+        if( isset( $xmlEntry->tags->categories->tag ) )
+        {
+            /**
+             * Category ID's placeholder.
+             * @var array
+             */
+            $categoryIds = array();
+
+            /**
+             * Map of category name to entryId in Craft.
+             * @var array
+             */
+            $categoriesMap = array(
+                'case studies'               => 124,
+                'internet marketing'         => 125,
+                'miscellaneous'              => 126,
+                'portfolio'                  => 127,
+                'projects'                   => 128,
+                'reputation management'      => 129,
+                'resources'                  => 130,
+                'search engine optimization' => 131,
+                'sem'                        => 132,
+                'services'                   => 133,
+                'social marketing'           => 134,
+                'video marketing'            => 135,
+                'web development'            => 136,
+            );
+
+            /**
+             * Loop through and set the categoryId.
+             */
+            foreach( $xmlEntry->tags->categories->tag as $category )
+            {
+                $category = strtolower($category);
+
+                if( array_key_exists($category, $categoriesMap) )
+                {
+                    $categoryIds[] = $categoriesMap[$category];
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if( count($categoryIds) > 0 )
+            {
+                craft()->relations->saveRelations(30, $this->entryId, $categoryIds);
+            }
+
+        }
+        else
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function saveTags( $entryId = null, $importEntry = null )
+    {
+    }
+
 }
