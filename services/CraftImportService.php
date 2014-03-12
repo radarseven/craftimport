@@ -322,19 +322,19 @@ class CraftImportService extends BaseApplicationComponent
              * @var array
              */
             $categoriesMap = array(
-                'case studies'               => 124,
-                'internet marketing'         => 125,
-                'miscellaneous'              => 126,
-                'portfolio'                  => 127,
-                'projects'                   => 128,
-                'reputation management'      => 129,
-                'resources'                  => 130,
-                'search engine optimization' => 131,
-                'sem'                        => 132,
-                'services'                   => 133,
-                'social marketing'           => 134,
-                'video marketing'            => 135,
-                'web development'            => 136,
+                'case studies'               => 748,
+                'internet marketing'         => 749,
+                'miscellaneous'              => 750,
+                'portfolio'                  => 751,
+                'projects'                   => 752,
+                'reputation management'      => 753,
+                'resources'                  => 754,
+                'search engine optimization' => 755,
+                'sem'                        => 756,
+                'services'                   => 757,
+                'social marketing'           => 758,
+                'video marketing'            => 759,
+                'web development'            => 760,
             );
 
             /**
