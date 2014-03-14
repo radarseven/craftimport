@@ -11,14 +11,21 @@ class CraftImportService extends BaseApplicationComponent
     protected $importCategories;
     protected $categoriesData;
     protected $entryId;
+    protected $matrixData;
+    protected $importMatrixData;
 
     public function __construct()
     {
         /**
+         * Matrix
+         * @var boolean
+         */
+        $this->importMatrixData = false;
+        /**
          * Tags
          * @var boolean
          */
-        $this->importTags = true;
+        $this->importTags = false;
 
         /**
          * Categories
@@ -42,6 +49,7 @@ class CraftImportService extends BaseApplicationComponent
          * Let's not bomb out!
          */
         set_time_limit(0);
+        ini_set('memory_limit', '512M');
 
         $retVal = false;
 
@@ -62,10 +70,6 @@ class CraftImportService extends BaseApplicationComponent
          *          fieldId = Matching Tags field ID in Craft.
          */
         $tagsData = array(
-            // 'categories' => array(
-            //     'setId'   => 2,
-            //     'fieldId' => 30,
-            // ),
             'tags' => array(
                 'setId'   => 3,
                 'fieldId' => 3,
@@ -77,7 +81,7 @@ class CraftImportService extends BaseApplicationComponent
          * @var integer
          */
         $sectionId = 8; // Visit settings for your Section and check the URL
-        $typeId = 8; // Visit Entry Types for your Section and check the URL for the Entry Type
+        $typeId    = 8; // Visit Entry Types for your Section and check the URL for the Entry Type
 
         /**
          * Loop through <entry> tags.
@@ -132,7 +136,7 @@ class CraftImportService extends BaseApplicationComponent
              * @ref craft/app/models/EntryModel
              */
             $entry->sectionId = $sectionId;
-            $entry->typeId = $typeId;
+            $entry->typeId    = $typeId;
 
             /**
              * Attempt to set `entry.authorId` intelligently
@@ -159,9 +163,9 @@ class CraftImportService extends BaseApplicationComponent
                 $entry->authorId = 1;  // Default, admin
             }
 
-            $entry->enabled = true;
+            $entry->enabled  = true;
             $entry->postDate = $importEntry->entry_date;
-            $entry->slug = $importEntry->slug;
+            $entry->slug     = $importEntry->slug;
 
             /**
              * Custom field attributes array.
@@ -171,7 +175,7 @@ class CraftImportService extends BaseApplicationComponent
 
             $attributesMap = array(
                 'title'            => 'title',
-                //'post'             => 'legacyBody',
+                //'post'           => 'legacyBody',
                 'image'            => 'legacyFeaturedImage',
                 'meta_title'       => 'metaSeoTitle',
                 'meta_description' => 'metaDescription',
@@ -197,19 +201,29 @@ class CraftImportService extends BaseApplicationComponent
                 }
             }
 
-            if( isset($importEntry->post) )
+            /**
+             * Import Matrix Blocks
+             */
+            if( $this->importMatrixData )
             {
-                // Add new rows
-                $matrixData['newPageContent'] = array(                // The 'new' prefix tells Matrix this is a new block
-                    'type' => 'text',
-                    'enabled' => true,
-                    'fields' => array(
-                        'text' => $post,
-                    )
-                );
+                $matrixData = array();
 
-                // Set the new Matrix data
-                $entry->getContent()->pageContent = $matrixData;
+                if( isset($importEntry->post) )
+                {
+                    // Add new rows
+                    // The 'new' prefix tells Matrix this is a new block
+                    $matrixData['pageContent'] = array(
+                        'type'    => 'text',
+                        'enabled' => true,
+                        'fields'  => array(
+                            //'text' => $post,
+                            'text' => '<p>My balls are BALLS.</p>',
+                        ),
+                    );
+
+                    // Set the new Matrix data
+                    $entry->setContentFromPost( array( 'pageContent' => $matrixData ) );
+                }
             }
 
             /**
@@ -252,7 +266,8 @@ class CraftImportService extends BaseApplicationComponent
                         foreach( $importEntry->tags->$tagElement->tag as $tagName )
                         {
                             $tag = new TagModel();
-                            $tag->setId = $tagData['setId'];
+                            //$tag->setId = $tagData['setId'];
+                            $tag->groupId = $tagData['setId'];
                             $tag->name = $tagName;
                             craft()->tags->saveTag($tag);
 
@@ -268,7 +283,17 @@ class CraftImportService extends BaseApplicationComponent
 
                             $tags[] = $tagRecord['id'];
                         }
-                        craft()->relations->saveRelations($tagData['fieldId'], $entryRecord['entryId'], $tags);
+
+                        /**
+                         * Need to grab the related field model and entry model to save relations.
+                         * P.S. I did not have sexual relations with that woman.
+                         */
+                        $relatedField = craft()->fields->getFieldById($tagData['fieldId']);
+                        $entry        = craft()->entries->getEntryById($entryRecord['entryId']);
+
+                        //craft()->relations->saveRelations($tagData['fieldId'], $entryRecord['entryId'], $tags);
+                        craft()->relations->saveRelations($relatedField, $entry, $tags);
+
                         //echo "<br />\n\n";
                     }
                 }
@@ -356,7 +381,10 @@ class CraftImportService extends BaseApplicationComponent
 
             if( count($categoryIds) > 0 )
             {
-                craft()->relations->saveRelations(30, $this->entryId, $categoryIds);
+                $fieldModel = craft()->fields->getFieldById(30);
+                $entryModel = craft()->entries->getEntryById($this->entryId);
+
+                craft()->relations->saveRelations($fieldModel, $entryModel, $categoryIds);
             }
 
         }
